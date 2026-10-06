@@ -18,6 +18,11 @@ class PayloadRepository:
         return self.db.get(Payload, payload_id)
 
     def create(self, request_hash: str, output: list[str]) -> Payload:
+        """Insert and flush without committing.
+
+        Raises IntegrityError if request_hash already exists; the caller owns the
+        transaction and must roll back before reusing the session.
+        """
         payload = Payload(request_hash=request_hash, output=output)
         self.db.add(payload)
         self.db.flush()
