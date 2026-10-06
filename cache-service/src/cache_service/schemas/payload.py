@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
 class PayloadRequest(BaseModel):
@@ -12,9 +12,14 @@ class PayloadRequest(BaseModel):
         return self
 
 
-class PayloadResponse(BaseModel):
-    id: str
-    request_hash: str
-    output: list[str]
+class PayloadCreatedResponse(BaseModel):
+    """Confirmation returned by POST; the id is stable for identical requests."""
 
-    model_config = ConfigDict(from_attributes=True)
+    id: str
+    message: str
+
+
+class PayloadResponse(BaseModel):
+    """The generated payload: transformed strings interleaved and joined with ', '."""
+
+    output: str

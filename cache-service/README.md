@@ -71,7 +71,7 @@ uvicorn cache_service.main:app --reload
 Create a payload:
 
 ```bash
-curl -X POST http://localhost:8000/payloads \
+curl -X POST http://localhost:8000/payload \
   -H "Content-Type: application/json" \
   -d '{"list_1": ["hello", "world"], "list_2": ["one", "two"]}'
 ```
@@ -82,7 +82,7 @@ with different lengths returns `422 Unprocessable Entity`.
 Fetch a previously generated payload:
 
 ```bash
-curl http://localhost:8000/payloads/<id>
+curl http://localhost:8000/payload/<id>
 ```
 
 ## Running the CLI

@@ -96,7 +96,7 @@ def test_conflicting_cache_insert_rolls_back_and_reuses_winner(db_session, monke
         # Simulate another request committing the same row just before our insert.
         if not state["raced"]:
             state["raced"] = True
-            real_create(self, input_text, "WINNER")
+            real_create(self, "a", "WINNER")
             self.db.commit()
         return real_create(self, input_text, transformed_text)
 
