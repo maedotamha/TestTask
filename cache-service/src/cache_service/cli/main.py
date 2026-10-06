@@ -57,7 +57,9 @@ def submit_and_fetch(client: httpx.Client, request: PayloadRequest) -> dict[str,
         fetched.raise_for_status()
         return {"id": payload_id, "output": fetched.json()["output"]}
     except httpx.HTTPStatusError as exc:
-        raise CLIError(f"server returned {exc.response.status_code}: {exc.response.text}", EXIT_FAILURE) from exc
+        raise CLIError(
+            f"server returned {exc.response.status_code}: {exc.response.text}", EXIT_FAILURE
+        ) from exc
     except httpx.HTTPError as exc:
         raise CLIError(f"cannot reach the server: {exc}", EXIT_FAILURE) from exc
     except (ValueError, KeyError) as exc:
@@ -83,7 +85,9 @@ def run(argv: list[str] | None = None, transport: httpx.BaseTransport | None = N
         check_output_does_not_clobber_input(settings)
 
         # All output goes to stderr on failure so stdout stays machine-readable JSON.
-        with httpx.Client(base_url=settings.host, timeout=REQUEST_TIMEOUT_SECONDS, transport=transport) as client:
+        with httpx.Client(
+            base_url=settings.host, timeout=REQUEST_TIMEOUT_SECONDS, transport=transport
+        ) as client:
             results = [submit_and_fetch(client, request) for _ in range(settings.repeat)]
         write_results(settings.output, results)
     except CLIError as exc:

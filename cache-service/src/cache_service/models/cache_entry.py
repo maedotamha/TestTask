@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, Text
 from sqlalchemy.orm import Mapped, mapped_column
@@ -15,5 +15,5 @@ class CacheEntry(Base):
     input_text: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
     transformed_text: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False
+        DateTime(timezone=True), default=lambda: datetime.now(UTC), nullable=False
     )

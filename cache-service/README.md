@@ -14,7 +14,9 @@ Two database tables back the service, with intentionally different identities:
 
 Given `list_1` and `list_2` (equal length), the service transforms each string
 (reusing cached results whenever possible) and interleaves the results as
-`[t(list_1[0]), t(list_2[0]), t(list_1[1]), t(list_2[1]), ...]`.
+`[t(list_1[0]), t(list_2[0]), t(list_1[1]), t(list_2[1]), ...]`, stored as a
+list and returned by `GET /payload/{id}` joined with `", "`. The transformer
+(`services/transformer.py`) upper-cases its input and stands in for an external service.
 
 The `request_hash` is a SHA-256 fingerprint of `{"list_1": [...], "list_2": [...]}`,
 which preserves list order and distinguishes `list_1` from `list_2`. Submitting
@@ -123,12 +125,18 @@ After `pip install -e .` the same command is available as `cache-cli`.
 pytest
 ```
 
-Tests use an isolated in-memory SQLite database per test and cover:
-- cache hits/misses (the transformer is only called for uncached strings)
-- payload deduplication (identical requests return the same id)
-- the `422` response for mismatched list lengths
-- the CLI's `--input`, `--output`, `--json`, and `--repeat` flags, including
-  stdin/stdout behavior
+Tests use an isolated in-memory SQLite database per test (no PostgreSQL in the
+automated suite) and cover:
+- model constraints: unique `input_text` / `request_hash`, rollback and recovery after a conflict
+- repositories: cache hit/miss, empty-string results, batch lookup
+- the service: transformer called only for uncached strings (also across payloads and
+  duplicates within one request), payload id reuse, order-sensitive hashing, recovery
+  from a simulated concurrent insert
+- the API: the sample POST/GET, 404, and 422 for invalid bodies
+- the CLI: every option, stdin/stdout, files, invalid input, conflicting arguments,
+  unreachable server and server errors (via an in-process transport, no real network)
+
+Lint and format: `ruff check src tests` and `ruff format --check src tests`.
 
 ## Docker
 
