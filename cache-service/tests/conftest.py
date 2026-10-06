@@ -51,3 +51,17 @@ def client(engine):
     test_client = TestClient(app)
     yield test_client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def cli_transport(client):
+    """An httpx transport that serves CLI requests from the in-process app."""
+    import httpx
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        response = client.request(
+            request.method, request.url.path, content=request.content, headers=dict(request.headers)
+        )
+        return httpx.Response(response.status_code, content=response.content)
+
+    return httpx.MockTransport(handler)

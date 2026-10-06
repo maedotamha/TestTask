@@ -87,24 +87,35 @@ curl http://localhost:8000/payload/<id>
 
 ## Running the CLI
 
-The CLI validates input the same way the API does and shares the `PayloadService`.
+The CLI is an HTTP client for the API (start the server first). Options are
+parsed by Pydantic Settings' CLI support:
+
+| Option                  | Meaning                                                              |
+|-------------------------|----------------------------------------------------------------------|
+| `-H`, `--host URL`      | API server URL (default `http://localhost:8000`)                     |
+| `-r`, `--repeat N`      | Iterations, N >= 1 (default 1)                                       |
+| `-i`, `--input FILE\|-` | JSON input file, or `-` for stdin                                    |
+| `-j`, `--json JSON`     | JSON input given directly as an argument                             |
+| `-o`, `--output FILE\|-`| Output file, or `-` for stdout (default `-`)                         |
+| `-h`, `--help`          | Usage                                                                |
+
+The assignment assigns `-h` to both `--host` and `--help`; argparse cannot
+register both, so `-h` stays `--help` and the host short option is `-H`.
+
+Exactly one of `--input` / `--json` is required; passing both is an error.
+Each iteration POSTs the request and GETs the payload back, and writes one
+JSON object (`{"id": ..., "output": ...}`) per line, so repeated runs show the
+same `id` being reused. Only results go to stdout; errors go to stderr.
+Exit codes: `0` success, `1` server unreachable/rejected, `2` bad arguments or input.
+Generic environment variables (e.g. `HOST`) are intentionally ignored.
 
 ```bash
-# Read from a file, write to stdout
-python -m cache_service.cli.main --input request.json
-
-# Read from stdin, write to a file
-echo '{"list_1": ["hello"], "list_2": ["one"]}' | python -m cache_service.cli.main --output result.txt
-
-# Full JSON output (id, request_hash, output) instead of a plain list
-python -m cache_service.cli.main --input request.json --json
-
-# Submit the same request multiple times to demonstrate deduplication
-python -m cache_service.cli.main --input request.json --repeat 5 --json
+python -m cache_service.cli.main -j '{"list_1": ["a"], "list_2": ["b"]}'
+python -m cache_service.cli.main -H http://localhost:8000 -i request.json -r 3 -o results.jsonl
+echo '{"list_1": ["a"], "list_2": ["b"]}' | python -m cache_service.cli.main -i -
 ```
 
-If `pip install -e .` was used, the `cache-service-cli` console script is also
-available as a shortcut for `python -m cache_service.cli.main`.
+After `pip install -e .` the same command is available as `cache-cli`.
 
 ## Tests
 
