@@ -9,6 +9,8 @@ from cache_service.repositories.cache_repository import CacheRepository
 from cache_service.repositories.payload_repository import PayloadRepository
 from cache_service.services.transformer import transform
 
+_MAX_CACHE_ATTEMPTS = 3
+
 
 def compute_request_hash(list_1: list[str], list_2: list[str]) -> str:
     """Fingerprint a request.
@@ -38,10 +40,11 @@ class PayloadService:
         if existing is not None:
             return existing
 
+        transformed = self._resolve_transformations([*list_1, *list_2])
         output: list[str] = []
-        for first, second in zip(list_1, list_2):
-            output.append(self._get_or_create_transformed(first))
-            output.append(self._get_or_create_transformed(second))
+        for first, second in zip(list_1, list_2, strict=True):
+            output.append(transformed[first])
+            output.append(transformed[second])
 
         try:
             payload = self.payload_repo.create(request_hash, output)
@@ -55,20 +58,29 @@ class PayloadService:
                 return existing
             raise
 
-    def _get_or_create_transformed(self, text: str) -> str:
-        entry = self.cache_repo.get_by_text(text)
-        if entry is not None:
-            return entry.transformed_text
+    def _resolve_transformations(self, texts: list[str]) -> dict[str, str]:
+        """Return {input: transformed} for every unique text, calling the transformer only on cache misses."""
+        unique_texts = set(texts)
+        resolved: dict[str, str] = {}
 
-        transformed = transform(text)
-        try:
-            entry = self.cache_repo.create(text, transformed)
-            self.db.commit()
-            return entry.transformed_text
-        except IntegrityError:
-            # A concurrent request inserted the same input_text first.
-            self.db.rollback()
-            entry = self.cache_repo.get_by_text(text)
-            if entry is not None:
-                return entry.transformed_text
-            raise
+        for _ in range(_MAX_CACHE_ATTEMPTS):
+            cached = self.cache_repo.get_many_by_text(unique_texts - resolved.keys())
+            resolved.update({text: entry.transformed_text for text, entry in cached.items()})
+
+            missing = unique_texts - resolved.keys()
+            if not missing:
+                return resolved
+
+            new_values = {text: transform(text) for text in missing}
+            try:
+                for text, value in new_values.items():
+                    self.cache_repo.create(text, value)
+                self.db.commit()
+            except IntegrityError:
+                # A concurrent request inserted one of these texts first; reread and retry only the rest.
+                self.db.rollback()
+                continue
+            resolved.update(new_values)
+            return resolved
+
+        raise RuntimeError("could not populate the transformation cache after repeated conflicts")

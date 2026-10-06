@@ -52,3 +52,57 @@ def test_mismatched_lengths_raise_value_error(db_session):
     service = PayloadService(db_session)
     with pytest.raises(ValueError):
         service.get_or_create_payload(["a"], ["b", "c"])
+
+
+def test_sample_input_produces_expected_output(db_session):
+    payload = PayloadService(db_session).get_or_create_payload(
+        ["first string", "second string", "third string"],
+        ["other string", "another string", "last string"],
+    )
+    assert ", ".join(payload.output) == (
+        "FIRST STRING, OTHER STRING, SECOND STRING, ANOTHER STRING, THIRD STRING, LAST STRING"
+    )
+
+
+def test_duplicate_strings_within_a_request_transform_once(db_session, monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setattr(payload_service_module, "transform", lambda t: calls.append(t) or t.upper())
+
+    payload = PayloadService(db_session).get_or_create_payload(["a", "a", "b"], ["b", "a", "a"])
+
+    assert sorted(calls) == ["a", "b"]
+    assert payload.output == ["A", "B", "A", "A", "B", "A"]
+
+
+def test_empty_string_cached_result_is_not_retransformed(db_session, monkeypatch):
+    calls: list[str] = []
+    monkeypatch.setattr(payload_service_module, "transform", lambda t: calls.append(t) or "")
+
+    service = PayloadService(db_session)
+    service.get_or_create_payload(["x"], ["y"])
+    service.get_or_create_payload(["x"], ["z"])
+
+    assert calls.count("x") == 1
+
+
+def test_conflicting_cache_insert_rolls_back_and_reuses_winner(db_session, monkeypatch):
+    from cache_service.repositories.cache_repository import CacheRepository
+
+    service = PayloadService(db_session)
+    real_create = CacheRepository.create
+    state = {"raced": False}
+
+    def racing_create(self, input_text, transformed_text):
+        # Simulate another request committing the same row just before our insert.
+        if not state["raced"]:
+            state["raced"] = True
+            real_create(self, input_text, "WINNER")
+            self.db.commit()
+        return real_create(self, input_text, transformed_text)
+
+    monkeypatch.setattr(CacheRepository, "create", racing_create)
+
+    payload = service.get_or_create_payload(["a"], ["b"])
+
+    assert payload.output[0] == "WINNER"
+    assert payload.output[1] == "B"
