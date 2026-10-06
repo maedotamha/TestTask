@@ -8,8 +8,6 @@ services:
       POSTGRES_DB: cache_service
     volumes:
       - db_data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U cache_service"]
       interval: 5s
@@ -25,7 +23,12 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg2://cache_service:cache_service@db:5432/cache_service
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   db_data:

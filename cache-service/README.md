@@ -134,11 +134,27 @@ Tests use an isolated in-memory SQLite database per test and cover:
 
 ```bash
 docker compose up --build
+# if port 8000 is taken on your machine:
+APP_PORT=8765 docker compose up --build
 ```
 
-This starts a PostgreSQL database and the API (on `http://localhost:8000`),
-configured entirely through the `DATABASE_URL` environment variable — no code
-changes needed to switch between SQLite (local dev) and PostgreSQL (Docker).
+This starts PostgreSQL and the API (default `http://localhost:8000`).
+
+- The app reaches the database at hostname `db` (the Compose service name), and
+  starts only after the database healthcheck passes (`depends_on: service_healthy`).
+- Data lives in the named volume `db_data`; `docker compose down` keeps it,
+  `docker compose down -v` deletes it.
+- The database port is not published to the host; only the API is.
+- The container runs as a non-root user and has a `/health` healthcheck.
+- The credentials in `docker-compose.yml` are development placeholders; change
+  them for any real deployment.
+- Dependencies are installed from `pyproject.toml` version ranges, not a lock file.
+
+Verified manually against this stack on PostgreSQL 16: the CLI sample returns the
+expected output, 30 concurrent identical POSTs returned one id, 30 concurrent POSTs
+with overlapping strings left no duplicate `input_text` rows, and a payload was
+still readable after restarting the app container. The automated test suite itself
+runs on SQLite only.
 
 ## Configuration
 

@@ -8,7 +8,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY pyproject.toml ./
 COPY src ./src
 
-RUN pip install --no-cache-dir ".[postgres]"
+RUN pip install --no-cache-dir ".[postgres]" \
+    && useradd --system --no-create-home app
+
+# The app only needs to read its code and talk to the database.
+USER app
 
 EXPOSE 8000
 
